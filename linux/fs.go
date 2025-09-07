@@ -5,10 +5,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"syscall"
+	"unsafe"
 )
 
 var ErrMountExist = errors.New("mount point already exists")
+var ErrMountNotExist = errors.New("mount point not exists")
 
 type FS struct {
 	source, target string
@@ -65,6 +68,44 @@ func (fs *FS) Mount() error {
 	}
 
 	return nil
+}
+
+func (fs *FS) ReadFile(path string) ([]byte, error) {
+	if fs.check != nil {
+		err := fs.check(fs.target)
+		if err != nil && !errors.Is(err, ErrMountExist) {
+			return nil, &FSError{op: "read file", fs: fs, Err: ErrMountNotExist}
+		}
+	}
+
+	if !filepath.IsAbs(path) {
+		path = filepath.Join(fs.target, path)
+	}
+
+	if !strings.HasPrefix(path, fs.target) {
+		return nil, &FSError{op: "read file", fs: fs, Err: fmt.Errorf("path %s has another mount point", path)}
+	}
+
+	return os.ReadFile(path)
+}
+
+func (fs *FS) WriteFile(path string, content string, perm os.FileMode) error {
+	if fs.check != nil {
+		err := fs.check(fs.target)
+		if err != nil && !errors.Is(err, ErrMountExist) {
+			return &FSError{op: "write file", fs: fs, Err: ErrMountNotExist}
+		}
+	}
+
+	if !filepath.IsAbs(path) {
+		path = filepath.Join(fs.target, path)
+	}
+
+	if !strings.HasPrefix(path, fs.target) {
+		return &FSError{op: "write file", fs: fs, Err: fmt.Errorf("path %s has another mount point", path)}
+	}
+
+	return os.WriteFile(path, unsafe.Slice(unsafe.StringData(content), len(content)), perm)
 }
 
 func checkExist(path string) func(target string) error {
