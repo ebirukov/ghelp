@@ -73,7 +73,7 @@ func (fs *FS) Mount() error {
 func (fs *FS) ReadFile(path string) ([]byte, error) {
 	if fs.check != nil {
 		err := fs.check(fs.target)
-		if err != nil && !errors.Is(err, ErrMountExist) {
+		if err == nil || !errors.Is(err, ErrMountExist) {
 			return nil, &FSError{op: "read file", fs: fs, Err: ErrMountNotExist}
 		}
 	}
@@ -92,7 +92,7 @@ func (fs *FS) ReadFile(path string) ([]byte, error) {
 func (fs *FS) WriteFile(path string, content string, perm os.FileMode) error {
 	if fs.check != nil {
 		err := fs.check(fs.target)
-		if err != nil && !errors.Is(err, ErrMountExist) {
+		if err == nil || !errors.Is(err, ErrMountExist) {
 			return &FSError{op: "write file", fs: fs, Err: ErrMountNotExist}
 		}
 	}
@@ -123,7 +123,7 @@ func checkExist(path string) func(target string) error {
 
 var ProcFS = NewFS("proc", "/proc", "proc", checkExist("self"))
 
-var TraceFS = NewFS("tracefs", "/sys/kernel/tracing", "tracefs", checkExist("trace_pipe"))
+var TraceFS = NewFS("tracefs", "/sys/kernel/tracing", "tracefs", checkExist("available_events"))
 
 var DebugFS = NewFS("debugfs", "/sys/kernel/debug", "debugfs", checkExist("tracing"))
 

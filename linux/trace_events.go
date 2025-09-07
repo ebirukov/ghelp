@@ -11,10 +11,6 @@ const (
 	defaultSubsystem = "syscalls"
 )
 
-func init() {
-	BootstrapEvents.Enable()
-}
-
 var BootstrapEvents TraceEvents = parseBootstrapEvents()
 
 type TraceEvents []string
@@ -78,7 +74,7 @@ func parseBootstrapEvents() []string {
 
 	bootstrapParams := strings.Fields(strings.Trim(string(cmdline), "\\x00[]"))
 
-	log.Printf("proc args: %v", bootstrapParams)
+	log.Printf("bootstrap params: %v", bootstrapParams)
 	for _, arg := range bootstrapParams {
 		if syscallParam, ok := strings.CutPrefix(arg, "trace_events="); ok {
 			for _, event := range strings.Split(syscallParam, ",") {
