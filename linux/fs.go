@@ -48,6 +48,14 @@ func NewFS(source, target, fsType string, check func(string) error) *FS {
 }
 
 func (fs *FS) Mount() error {
+	return fs.MountWithFlags(0)
+}
+
+func (fs *FS) Unmount(flags int) error {
+	return syscall.Unmount(fs.target, flags)
+}
+
+func (fs *FS) MountWithFlags(flags uintptr) error {
 	if fs.check != nil {
 		err := fs.check(fs.target)
 		if err != nil {
@@ -63,7 +71,7 @@ func (fs *FS) Mount() error {
 		return &FSError{op: "mount", fs: fs, Err: err}
 	}
 
-	if err := syscall.Mount(fs.source, fs.target, fs.fsType, 0, ""); err != nil {
+	if err := syscall.Mount(fs.source, fs.target, fs.fsType, flags, ""); err != nil {
 		return &FSError{op: "mount", fs: fs, Err: err}
 	}
 
@@ -87,6 +95,25 @@ func (fs *FS) ReadFile(path string) ([]byte, error) {
 	}
 
 	return os.ReadFile(path)
+}
+
+func (fs *FS) ReadLink(path string) (string, error) {
+	if fs.check != nil {
+		err := fs.check(fs.target)
+		if err == nil || !errors.Is(err, ErrMountExist) {
+			return "", &FSError{op: "read link", fs: fs, Err: ErrMountNotExist}
+		}
+	}
+
+	if !filepath.IsAbs(path) {
+		path = filepath.Join(fs.target, path)
+	}
+
+	if !strings.HasPrefix(path, fs.target) {
+		return "", &FSError{op: "read link", fs: fs, Err: fmt.Errorf("path %s has another mount point", path)}
+	}
+
+	return os.Readlink(path)
 }
 
 func (fs *FS) WriteFile(path string, content string, perm os.FileMode) error {
@@ -130,3 +157,5 @@ var DebugFS = NewFS("debugfs", "/sys/kernel/debug", "debugfs", checkExist("traci
 var CgroupFS = NewFS("cgroup2", "/sys/fs/cgroup", "cgroup2", checkExist("cgroup.controllers"))
 
 var TempFS = NewFS("tmpfs", "/tmp", "tmpfs", nil)
+
+var DevFS = NewFS("udev", "/dev", "devtmpfs", nil)
